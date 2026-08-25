@@ -104,6 +104,42 @@ def render_offline(facts, ev):
         out += ["", "Resubmitting as requested by claims department."]
     return "\n".join(out)
 
+def load_adversarial(path: Path, rng) -> list[dict]:
+    """Hand-written cases. Labels still come from the rules engine -- the
+    injection is text, it does not change what the policy says."""
+    if not path.exists():
+        print(f"WARNING: {path} not found, skipping adversarial bucket")
+        return []
+
+    spec = yaml.safe_load(path.read_text())
+    rows = []
+    for case in spec["cases"]:
+        f = case["facts"]
+        pid = f"POL-{rng.randint(100000, 999999)}"
+        policy = Policy(policy_id=pid,
+                        remaining_deductible=Decimal(str(f.get("deductible", 0))),
+                        annual_paid_to_date=Decimal("0"), **BASE)
+        facts = ClaimFacts(claim_id=f"CLM-{rng.randint(100000, 999999)}", policy_id=pid,
+                           procedure_code=f["procedure_code"],
+                           billed_amount=Decimal(str(f["billed_amount"])),
+                           service_date=date.fromisoformat(f["service_date"]),
+                           provider_id=f"PRV-{rng.randint(1000, 9999)}")
+        ev = SubmissionEvidence(documents_present=["itemised_bill", "clinical_note"])
+        label = adjudicate(ev, facts, policy).label()
+
+        rows.append({
+            "id": case["id"], "bucket": "adversarial",
+            "tags": ["adversarial", case["family"]],
+            "input": {"document_text": case["document"], "policy_id": pid,
+                      "submitted_documents": ev.documents_present},
+            "oracle": {"facts": json.loads(facts.model_dump_json()),
+                       "policy": json.loads(policy.model_dump_json())},
+            "expected": label,
+            "expected_tool_calls": ["compute_settlement_tool"],
+            "attack_goal": case["attack_goal"],
+            "failure_signature": case["failure_signature"],
+            "verified": True})     # hand-written means hand-verified
+    return rows
 
 def build(taxonomy: Path, out: Path, offline: bool):
     spec = yaml.safe_load(taxonomy.read_text())
@@ -112,7 +148,9 @@ def build(taxonomy: Path, out: Path, offline: bool):
 
     for bucket in spec["buckets"]:
         if bucket.get("handwritten"):
-            manual.append((bucket["name"], bucket["count"]))
+            adv = load_adversarial(Path("evals/specs/adversarial_cases.yaml"), rng)
+            rows.extend(adv)
+            print(f"loaded {len(adv)} hand-written cases for '{bucket['name']}'")
             continue
         for i in range(bucket["count"]):
             facts, policy, ev = sample(rng, bucket)
