@@ -1,0 +1,47 @@
+name: docker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - "tools/**"
+      - "src/**"
+      - "requirements.txt"
+      - "**/Dockerfile"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -f tools/policy_rules/Dockerfile -t policy-rules:ci .
+
+      - name: Start container
+        run: docker run -d --name policy-rules -p 8080:8080 policy-rules:ci
+
+      - name: Wait for health
+        run: |
+          for i in $(seq 1 20); do
+            if curl -sf http://localhost:8080/health > /dev/null; then
+              echo "healthy after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Container did not become healthy within 20s"
+          docker logs policy-rules
+          exit 1
+
+      - name: Verify non-root
+        run: |
+          USER_ID=$(docker exec policy-rules id -u)
+          if [ "$USER_ID" = "0" ]; then
+            echo "::error::Container is running as root"; exit 1
+          fi
+          echo "running as uid $USER_ID"
+
+      - name: Teardown
+        if: always()
+        run: docker rm -f policy-rules

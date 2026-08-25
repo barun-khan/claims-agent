@@ -1,0 +1,43 @@
+name: eval
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: uv pip install --system -r requirements.txt
+
+      - name: Unit tests
+        run: pytest tests/test_rules.py tests/test_mcp_server.py -q
+
+      # Proves the dataset is reproducible from source, not a file that
+      # happened to be committed once.
+      - name: Rebuild dataset from taxonomy
+        run: python -m evals.generate.build_dataset --offline
+
+      - name: Assert dataset is unchanged
+        run: |
+          if ! git diff --quiet evals/datasets/golden_v1.jsonl; then
+            echo "::error::Regenerating the dataset produced different output."
+            echo "Either the taxonomy changed without regenerating, or generation is not deterministic."
+            git diff --stat evals/datasets/golden_v1.jsonl
+            exit 1
+          fi
+
+      - name: Harness self-test
+        run: pytest tests/test_harness.py -q
+
+      - name: Eval report
+        run: python -m evals.runner --agent oracle
