@@ -64,6 +64,19 @@ def compute_settlement_tool(
         "policy_period": f"{policy.effective_from} to {policy.expires_on}",
     }
 
+@mcp.custom_route("/health", methods=["GET"])
+async def health(request):
+    """Liveness probe. Deliberately does no work beyond confirming the
+    process is serving. A probe that checks dependencies turns a downstream
+    outage into a restart loop."""
+    from starlette.responses import JSONResponse
+    return JSONResponse({"status": "ok", "service": "policy-rules"})
 
 if __name__ == "__main__":
-    mcp.run()
+    import os
+    transport = os.getenv("MCP_TRANSPORT", "stdio")
+    if transport == "http":
+        import uvicorn
+        uvicorn.run(mcp.streamable_http_app(), host="0.0.0.0", port=8080)
+    else:
+        mcp.run()
