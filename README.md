@@ -1,5 +1,8 @@
 # Agentic Claims Adjudication
 
+![eval](https://github.com/barun-khan/claims-agent/actions/workflows/eval.yml/badge.svg)
+![docker](https://github.com/barun-khan/claims-agent/actions/workflows/docker.yml/badge.svg)
+
 An enterprise-grade agentic AI system for insurance claim adjudication,
 built on the Azure AI stack.
 
