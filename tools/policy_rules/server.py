@@ -7,12 +7,12 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal, InvalidOperation
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.fastmcp import FastMCP
 
 from src.contracts.claim import ClaimFacts, compute_settlement
 from tools.policy_rules.store import PolicyNotFound, get_policy
 
-mcp = MCPServer("policy-rules")
+mcp = FastMCP("policy-rules")
 
 
 @mcp.tool()
