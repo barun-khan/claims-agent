@@ -68,7 +68,7 @@ class ClaimDecision(BaseModel):
     decision: Literal["approve", "deny", "escalate"]
     payout: Decimal
     reason: str
-    clauses: list[str] = Field(min_length=1)
+    clauses: list[str] = Field(default_factory=list)
     rationale: str = Field(max_length=1200)
     confidence: float = Field(ge=0, le=1)
 

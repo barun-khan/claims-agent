@@ -53,3 +53,10 @@ async def oracle(case: dict) -> AgentTrace:
 
 
 STUBS = {"always_escalate": always_escalate, "random": random_guess, "oracle": oracle}
+
+async def foundry(case: dict) -> AgentTrace:
+    from src.agents.adjudicator import run_case
+    return await run_case(case)
+
+
+STUBS["foundry"] = foundry

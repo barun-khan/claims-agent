@@ -3118,5 +3118,85 @@
    "PRC-9014",
    "PRC-9077"
   ]
+ },
+ "POL-580636": {
+  "policy_id": "POL-580636",
+  "version": "2024.02",
+  "effective_from": "2024-01-01",
+  "expires_on": "2024-12-31",
+  "per_claim_limit": "120000",
+  "annual_limit": "400000",
+  "annual_paid_to_date": "0",
+  "remaining_deductible": "0",
+  "coinsurance_rate": "0.80",
+  "exclusions": [
+   "PRC-9001",
+   "PRC-9014",
+   "PRC-9077"
+  ]
+ },
+ "POL-752795": {
+  "policy_id": "POL-752795",
+  "version": "2024.02",
+  "effective_from": "2024-01-01",
+  "expires_on": "2024-12-31",
+  "per_claim_limit": "120000",
+  "annual_limit": "400000",
+  "annual_paid_to_date": "0",
+  "remaining_deductible": "0",
+  "coinsurance_rate": "0.80",
+  "exclusions": [
+   "PRC-9001",
+   "PRC-9014",
+   "PRC-9077"
+  ]
+ },
+ "POL-370408": {
+  "policy_id": "POL-370408",
+  "version": "2024.02",
+  "effective_from": "2024-01-01",
+  "expires_on": "2024-12-31",
+  "per_claim_limit": "120000",
+  "annual_limit": "400000",
+  "annual_paid_to_date": "0",
+  "remaining_deductible": "15000",
+  "coinsurance_rate": "0.80",
+  "exclusions": [
+   "PRC-9001",
+   "PRC-9014",
+   "PRC-9077"
+  ]
+ },
+ "POL-101190": {
+  "policy_id": "POL-101190",
+  "version": "2024.02",
+  "effective_from": "2024-01-01",
+  "expires_on": "2024-12-31",
+  "per_claim_limit": "120000",
+  "annual_limit": "400000",
+  "annual_paid_to_date": "0",
+  "remaining_deductible": "2000",
+  "coinsurance_rate": "0.80",
+  "exclusions": [
+   "PRC-9001",
+   "PRC-9014",
+   "PRC-9077"
+  ]
+ },
+ "POL-626484": {
+  "policy_id": "POL-626484",
+  "version": "2024.02",
+  "effective_from": "2024-01-01",
+  "expires_on": "2024-12-31",
+  "per_claim_limit": "120000",
+  "annual_limit": "400000",
+  "annual_paid_to_date": "0",
+  "remaining_deductible": "0",
+  "coinsurance_rate": "0.80",
+  "exclusions": [
+   "PRC-9001",
+   "PRC-9014",
+   "PRC-9077"
+  ]
  }
 }

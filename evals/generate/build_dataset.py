@@ -172,6 +172,10 @@ def build(taxonomy: Path, out: Path, offline: bool):
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    store = {r["oracle"]["policy"]["policy_id"]: r["oracle"]["policy"]
+        for r in rows if r["oracle"]["policy"]}
+    Path("tools/policy_rules/policies.json").write_text(json.dumps(store, indent=1))
+    print(f"wrote {len(store)} policies -> tools/policy_rules/policies.json")
     print(f"wrote {len(rows)} cases -> {out}")
     for name, n in manual:
         print(f"MANUAL: bucket '{name}' needs {n} hand-written cases")
