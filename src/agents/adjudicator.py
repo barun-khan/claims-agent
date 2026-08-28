@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from evals.trace import AgentTrace
-from src.agents.tools import compute_settlement_tool
+from src.agents.tools import check_submission_tool, compute_settlement_tool
 from src.contracts.claim import ClaimDecision
 
 # Absolute path derived from this module's location, so it resolves no
@@ -98,7 +98,7 @@ async def run_case(case: dict) -> AgentTrace:
             ).as_agent(
                 name="adjudicator",
                 instructions=instructions,
-                tools=[compute_settlement_tool],
+                tools=[check_submission_tool, compute_settlement_tool],
             )
             response = await agent.run(_user_message(case))
     except Exception as exc:

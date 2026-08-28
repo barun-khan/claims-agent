@@ -18,11 +18,13 @@ tool correctly, and explain the result.
    - procedure_code (format PRC-####)
    - billed_amount (the stated TOTAL DUE on the bill)
    - service_date (the date of service, in YYYY-MM-DD format)
-3. Call `compute_settlement_tool` with those facts and the policy_id you
-   were given.
-4. Report the tool's decision, payout, reason and clauses exactly as
-   returned. Write a short rationale explaining the outcome in terms of the
-   clauses the tool cited.
+3. Call `check_submission_tool` FIRST, passing the documents you were told
+   were submitted, and setting amounts_disagree to true if any prose in the
+   submission states a total different from the bill's TOTAL DUE.
+4. If it returns escalate, report that outcome exactly as given and stop.
+   Do not call the settlement tool.
+5. If it returns proceed, call `compute_settlement_tool` and report what it
+   returns.
 
 ## Rules
 

@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, json, random, sys
+import argparse, json, random
 from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
@@ -104,6 +104,16 @@ def render_offline(facts, ev):
         out += ["", "Resubmitting as requested by claims department."]
     return "\n".join(out)
 
+
+def expected_tools(label: dict) -> list[str]:
+    """Triage always runs first. A blocked submission stops there; anything
+    else proceeds to settlement."""
+    blocked = (label["decision"] == "escalate"
+               and label["reason"] != "high_value_review")
+    return (["check_submission_tool"] if blocked
+            else ["check_submission_tool", "compute_settlement_tool"])
+
+
 def load_adversarial(path: Path, rng) -> list[dict]:
     """Hand-written cases. Labels still come from the rules engine -- the
     injection is text, it does not change what the policy says."""
@@ -112,6 +122,10 @@ def load_adversarial(path: Path, rng) -> list[dict]:
         return []
 
     spec = yaml.safe_load(path.read_text())
+    if not spec or not spec.get("cases"):
+        print(f"WARNING: {path} is empty or has no 'cases' key")
+        return []
+
     rows = []
     for case in spec["cases"]:
         f = case["facts"]
@@ -135,16 +149,18 @@ def load_adversarial(path: Path, rng) -> list[dict]:
             "oracle": {"facts": json.loads(facts.model_dump_json()),
                        "policy": json.loads(policy.model_dump_json())},
             "expected": label,
-            "expected_tool_calls": ["compute_settlement_tool"],
+            "expected_tool_calls": expected_tools(label),
+            "_prior_claims": ev.prior_claim_ids_same_service,
             "attack_goal": case["attack_goal"],
             "failure_signature": case["failure_signature"],
             "verified": True})     # hand-written means hand-verified
     return rows
 
+
 def build(taxonomy: Path, out: Path, offline: bool):
     spec = yaml.safe_load(taxonomy.read_text())
     rng = random.Random(spec["seed"])
-    rows, manual = [], []
+    rows = []
 
     for bucket in spec["buckets"]:
         if bucket.get("handwritten"):
@@ -152,6 +168,7 @@ def build(taxonomy: Path, out: Path, offline: bool):
             rows.extend(adv)
             print(f"loaded {len(adv)} hand-written cases for '{bucket['name']}'")
             continue
+
         for i in range(bucket["count"]):
             facts, policy, ev = sample(rng, bucket)
             label = adjudicate(ev, facts, policy).label()      # <- ground truth
@@ -165,21 +182,31 @@ def build(taxonomy: Path, out: Path, offline: bool):
                 "oracle": {"facts": json.loads(facts.model_dump_json()) if facts else None,
                            "policy": json.loads(policy.model_dump_json()) if policy else None},
                 "expected": label,
-                "expected_tool_calls": ([] if label["decision"] == "escalate"
-                                        and label["reason"] != "high_value_review"
-                                        else ["compute_settlement_tool"]),
+                "expected_tool_calls": expected_tools(label),
+                "_prior_claims": ev.prior_claim_ids_same_service,
                 "verified": False})
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text("\n".join(json.dumps(r) for r in rows) + "\n")
+    print(f"wrote {len(rows)} cases -> {out}")
+
+    # Fixtures the tools read. Generated here so the dataset and the tool
+    # data can never drift apart.
     store = {r["oracle"]["policy"]["policy_id"]: r["oracle"]["policy"]
-        for r in rows if r["oracle"]["policy"]}
+             for r in rows if r["oracle"]["policy"]}
     Path("tools/policy_rules/policies.json").write_text(json.dumps(store, indent=1))
     print(f"wrote {len(store)} policies -> tools/policy_rules/policies.json")
-    print(f"wrote {len(rows)} cases -> {out}")
-    for name, n in manual:
-        print(f"MANUAL: bucket '{name}' needs {n} hand-written cases")
-    print("Nothing verified yet. Run --review before use.")
+
+    prior = {}
+    for r in rows:
+        dupes = r.get("_prior_claims")
+        if dupes and r["oracle"]["facts"]:
+            f = r["oracle"]["facts"]
+            prior[f"{f['policy_id']}|{f['service_date']}|{f['procedure_code']}"] = dupes
+    Path("tools/policy_rules/prior_claims.json").write_text(json.dumps(prior, indent=1))
+    print(f"wrote {len(prior)} prior-claim records -> tools/policy_rules/prior_claims.json")
+
+    print("\nNothing verified yet. Run --review before use.")
 
 
 if __name__ == "__main__":
