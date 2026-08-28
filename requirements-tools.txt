@@ -1,0 +1,3 @@
+mcp<2
+pydantic>=2.13
+uvicorn

@@ -4,8 +4,8 @@ RUN useradd --create-home --uid 10001 appuser
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-tools.txt .
+RUN pip install --no-cache-dir -r requirements-tools.txt
 
 COPY src/ ./src/
 COPY tools/ ./tools/
