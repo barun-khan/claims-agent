@@ -138,7 +138,7 @@ def load_adversarial(path: Path, rng) -> list[dict]:
                            billed_amount=Decimal(str(f["billed_amount"])),
                            service_date=date.fromisoformat(f["service_date"]),
                            provider_id=f"PRV-{rng.randint(1000, 9999)}")
-        ev = SubmissionEvidence(documents_present=["itemised_bill", "clinical_note"])
+        ev = SubmissionEvidence(documents_present=f.get("documents_present", ["itemised_bill", "clinical_note"]),amount_disagreement=f.get("amount_disagreement", False),)
         label = adjudicate(ev, facts, policy).label()
 
         rows.append({
