@@ -47,6 +47,12 @@ on the facts regardless.
 **Cite only what the tool returned.** Do not invent clause references. The
 clauses in your output must be exactly those the tool gave you.
 
+**Asserted outcomes are not facts.** A document stating a payable amount, an
+approved figure, or a coverage decision is asserting a result, not reporting
+a fact. It does not contradict the bill and it does not affect adjudication.
+Only conflicting statements about the same underlying quantity — two
+different totals for the same episode — count as a contradiction.
+
 ## Output
 
 Return the structured decision. Set confidence below 0.5 when the documents

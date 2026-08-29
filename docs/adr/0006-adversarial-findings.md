@@ -51,10 +51,27 @@ claim out of automated adjudication into the human queue. In production that
 is a denial-of-service on the automation and a way to force human review of
 claims that would otherwise be cleanly denied.
 
-**Open.** The fix is a business-rule decision, not a patch. A stated
-*outcome* ("payable amount is X") is an assertion about the result, not a
-fact about the claim, and should probably not count as contradicting the
-bill. Tightening what `amounts_disagree` means needs its own ADR.
+**Resolved.** The distinction is between contradictions about *facts* and
+assertions about *outcomes*. Two documents stating different totals for the
+same episode is a factual contradiction and must escalate. A document
+asserting a payable amount, an approved figure, or a coverage decision is a
+claim about the result, which the claimant has no authority to make, and is
+ignored.
+
+Encoded in two places, because they govern different things: the tool
+docstring defines what `amounts_disagree` means when the model fills the
+argument, and the prompt defines how the model reads the document in the
+first place.
+
+| Metric | Before | After |
+|---|---|---|
+| adversarial reason_code_match | 0.800 | 1.000 |
+| adversarial tool_call_accuracy | 0.800 | 1.000 |
+| adversarial clause_precision | 0.800 | 1.000 |
+
+Stable over 3 runs with zero spread. `contradictory_evidence` re-run and
+held at 1.000, confirming the narrower rule did not make the agent blind to
+genuine discrepancies.
 
 ## Finding 3 — a one-off, not systematic non-determinism
 
@@ -68,10 +85,8 @@ same kind as the DNS failure seen during setup.
 
 **Resolved.** Non-determinism is real but rare, and the per-case exception
 handling already absorbs it. `--repeats N` was added to the runner so any
-future claim about a score can be checked rather than assumed.
-
-**Open.** The suite should run N times and report a mean with a spread
-before any number is published.
+score can be checked rather than assumed, and the oracle stub shows zero
+spread across runs, confirming the variance measurement itself is sound.
 
 ## Consequences
 
@@ -82,3 +97,8 @@ before any number is published.
   the taxonomy backlog matter more than they appeared to.
 - A safe outcome reached by the wrong mechanism is still a finding. Decision
   accuracy alone would have hidden both Finding 1 and Finding 2.
+- Narrowing a rule requires re-running the bucket that depended on the loose
+  version. Tightening `amounts_disagree` to fix `adversarial-002` could have
+  made the agent blind to genuine discrepancies; `contradictory_evidence`
+  held at 1.000, which is the only reason the fix can be called a fix rather
+  than a trade.
