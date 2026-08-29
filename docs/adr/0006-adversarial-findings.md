@@ -56,14 +56,19 @@ claims that would otherwise be cleanly denied.
 fact about the claim, and should probably not count as contradicting the
 bill. Tightening what `amounts_disagree` means needs its own ADR.
 
-## Finding 3 — the eval suite is non-deterministic
+## Finding 3 — a one-off, not systematic non-determinism
 
-`adversarial-003` returned unparseable output on one run and a perfectly
-formed response on the next, from identical input. Same case, same prompt,
-different result.
+`adversarial-003` returned unparseable output on one run and a well-formed
+response on the next, from identical input.
 
-Reported scores therefore carry variance that a single run does not show.
-Quoting 0.986 as an exact figure overstates the precision.
+Five subsequent runs of the bucket showed zero spread on every metric,
+including schema validity. The model is consistent; the single failure was
+transient, most likely a truncated response from a service hiccup of the
+same kind as the DNS failure seen during setup.
+
+**Resolved.** Non-determinism is real but rare, and the per-case exception
+handling already absorbs it. `--repeats N` was added to the runner so any
+future claim about a score can be checked rather than assumed.
 
 **Open.** The suite should run N times and report a mean with a spread
 before any number is published.

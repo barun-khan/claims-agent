@@ -18,10 +18,13 @@ def load_cases(path: Path) -> list[dict]:
     return cases
 
 
-async def run_agent(agent, cases: list[dict], concurrency: int) -> list[tuple[dict, AgentTrace]]:
+async def run_agent(agent, cases: list[dict], concurrency: int,
+                    repeats: int = 1) -> list[tuple[dict, AgentTrace, int]]:
+    """Run every case `repeats` times. Model output is non-deterministic, so
+    a single pass is one sample, not a measurement."""
     sem = asyncio.Semaphore(concurrency)
 
-    async def one(case):
+    async def one(case, run_index):
         async with sem:
             t0 = time.perf_counter()
             try:
@@ -29,9 +32,10 @@ async def run_agent(agent, cases: list[dict], concurrency: int) -> list[tuple[di
             except Exception as exc:      # a crashed agent scores zero, it does not abort the run
                 trace = AgentTrace(case_id=case["id"], error=repr(exc))
             trace.latency_ms = trace.latency_ms or (time.perf_counter() - t0) * 1000
-            return case, trace
+            return case, trace, run_index
 
-    return await asyncio.gather(*(one(c) for c in cases))
+    jobs = [one(c, i) for i in range(repeats) for c in cases]
+    return await asyncio.gather(*jobs)
 
 
 def score(results) -> dict:
@@ -41,7 +45,7 @@ def score(results) -> dict:
     false_approvals, latencies = [], []
     tin = tout = 0
 
-    for case, trace in results:
+    for case, trace, _ in results:
         exp = case["expected"]
         for m in METRICS:
             per_metric[m.name].append(m.score(trace, exp))
@@ -67,6 +71,7 @@ def score(results) -> dict:
         "p95_ms": sorted(latencies)[int(0.95 * (n - 1))],
         "cost_usd": (tin / 1000 * PRICE_IN_PER_1K) + (tout / 1000 * PRICE_OUT_PER_1K),
     }
+
 
 def check_gates(rep: dict, spec: dict) -> list[str]:
     failures = []
@@ -110,6 +115,37 @@ def print_report(rep: dict, failures: list[str]) -> None:
         print("\nall gates passed")
 
 
+def print_variance(reps: list[dict]) -> None:
+    """Model output is non-deterministic. A single run is one sample; this
+    reports the spread so a score can be quoted honestly."""
+    n = len(reps)
+    print(f"\n{'=' * 62}")
+    print(f"VARIANCE OVER {n} RUNS ({reps[0]['n']} cases each)\n")
+
+    print(f"  {'METRIC':22} {'MEAN':>7} {'MIN':>7} {'MAX':>7} {'SPREAD':>7}")
+    for name in reps[0]["metrics"]:
+        vals = [r["metrics"][name] for r in reps]
+        print(f"  {name:22} {sum(vals)/n:7.3f} {min(vals):7.3f} {max(vals):7.3f} "
+              f"{max(vals)-min(vals):7.3f}")
+
+    fa = [r["false_approval_rate"] for r in reps]
+    print(f"  {'false_approval_rate':22} {sum(fa)/n:7.3f} {min(fa):7.3f} "
+          f"{max(fa):7.3f} {max(fa)-min(fa):7.3f}")
+
+    print("\nUNSTABLE BUCKETS (score differed between runs)")
+    unstable = False
+    for bucket in reps[0]["buckets"]:
+        vals = [r["buckets"][bucket] for r in reps]
+        if max(vals) - min(vals) > 0:
+            unstable = True
+            print(f"  {bucket:24} " + "  ".join(f"{v:.3f}" for v in vals))
+    if not unstable:
+        print("  none -- every bucket scored identically in all runs")
+
+    total = sum(r["cost_usd"] for r in reps)
+    print(f"\ntotal cost across {n} runs: ${total:.4f}")
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--agent", default="always_escalate", choices=list(STUBS))
@@ -117,6 +153,8 @@ async def main() -> int:
     ap.add_argument("--taxonomy", type=Path, default=Path("evals/specs/taxonomy.yaml"))
     ap.add_argument("--concurrency", type=int, default=5)
     ap.add_argument("--bucket", help="run only this bucket")
+    ap.add_argument("--repeats", type=int, default=1,
+                    help="run the suite N times and report mean and spread")
     args = ap.parse_args()
 
     cases = load_cases(args.dataset)
@@ -124,11 +162,23 @@ async def main() -> int:
         cases = [c for c in cases if c["bucket"] == args.bucket]
     spec = yaml.safe_load(args.taxonomy.read_text())
 
-    results = await run_agent(STUBS[args.agent], cases, args.concurrency)
-    rep = score(results)
-    failures = check_gates(rep, spec)
-    print_report(rep, failures)
-    return 1 if failures else 0
+    if args.repeats == 1:
+        results = await run_agent(STUBS[args.agent], cases, args.concurrency)
+        rep = score(results)
+        failures = check_gates(rep, spec)
+        print_report(rep, failures)
+        return 1 if failures else 0
+
+    reps = []
+    for i in range(args.repeats):
+        results = await run_agent(STUBS[args.agent], cases, args.concurrency)
+        rep = score(results)
+        reps.append(rep)
+        print(f"run {i + 1}/{args.repeats}: decision_match "
+              f"{rep['metrics']['decision_match']:.3f}")
+
+    print_variance(reps)
+    return 1 if check_gates(reps[-1], spec) else 0
 
 
 if __name__ == "__main__":
