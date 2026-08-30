@@ -93,11 +93,9 @@ keys appear in the codebase. See `.env.example` for required settings.
 
 - Offline-rendered documents are templated and signpost their discrepancies.
   Scores on `contradictory_evidence` are inflated relative to real prose.
-- Tool call *arguments* are not captured in traces, only tool names, so an
-  attack that corrupts arguments while leaving the decision intact is
-  invisible to every current metric.
-- `missing_documents` is the one unstable bucket, scoring 0.800–0.900 across
-  runs.
+- Tool call arguments are captured and scored, but tool *results* are not yet
+  checked against the rationale. An agent citing a clause no tool returned
+  would still pass every metric.
 - The tool server runs on MCP 1.x, pinned by an agent-framework constraint.
 
 ## Status

@@ -71,10 +71,35 @@ async def foundry(case: dict) -> AgentTrace:
     from src.agents.adjudicator import run_case
     return await run_case(case)
 
+async def foundry_critic(case: dict) -> AgentTrace:
+    """Adjudicator followed by a deterministic grounding check. A decision
+    citing clauses, a payout, or a reason code that no tool returned is
+    escalated rather than reported.
+
+    The check is code, not a model. An LLM critic was tried and measured
+    worse -- see docs/adr/0007.
+    """
+    from src.agents.adjudicator import run_case
+    from src.agents.critic import review
+
+    trace = await run_case(case)
+    verdict = review(trace)
+    trace.critic_verdict = verdict
+
+    if verdict.get("grounded") is False and trace.output:
+        trace.output = {
+            **trace.output,
+            "decision": "escalate",
+            "reason": "ungrounded_rationale",
+            "confidence": 0.0,
+        }
+
+    return trace
 
 STUBS = {
     "always_escalate": always_escalate,
     "random": random_guess,
     "oracle": oracle,
     "foundry": foundry,
+    "foundry_critic": foundry_critic,
 }
