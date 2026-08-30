@@ -15,7 +15,7 @@ from azure.identity.aio import AzureCliCredential
 from dotenv import load_dotenv
 from pydantic import ValidationError
 
-from evals.trace import AgentTrace
+from evals.trace import AgentTrace, ToolCall
 from src.agents.tools import check_submission_tool, compute_settlement_tool
 from src.contracts.claim import ClaimDecision
 
@@ -69,16 +69,38 @@ def _parse_output(text: str) -> dict | None:
         return None
 
 
-def _tool_calls(response) -> list[str]:
-    """Extract tool names from the message history. Content is a single
-    union type carrying every possible field, so we discriminate on `type`
-    rather than on the Python class."""
-    names = []
+def _safe_json(value) -> dict:
+    if isinstance(value, dict):
+        return value
+    try:
+        return json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return {"_raw": str(value)}
+
+
+def _extract_calls(response) -> list[ToolCall]:
+    """Content is a single union type, so we discriminate on `type`.
+    Function calls and their results arrive as separate messages linked by
+    call_id.
+
+    Arguments and results are captured, not just names: an attack that
+    corrupts a tool argument while leaving the decision intact is invisible
+    to every name-only metric.
+    """
+    calls: dict[str, ToolCall] = {}
+    order: list[str] = []
+
     for msg in response.messages:
-        for content in getattr(msg, "contents", []):
-            if getattr(content, "type", None) == "function_call":
-                names.append(content.name)
-    return names
+        for c in getattr(msg, "contents", []):
+            ctype = getattr(c, "type", None)
+            if ctype == "function_call":
+                cid = c.call_id
+                order.append(cid)
+                calls[cid] = ToolCall(name=c.name, arguments=_safe_json(c.arguments))
+            elif ctype == "function_result" and c.call_id in calls:
+                calls[c.call_id].result = _safe_json(c.result)
+
+    return [calls[cid] for cid in order]
 
 
 async def run_case(case: dict) -> AgentTrace:
@@ -102,7 +124,7 @@ async def run_case(case: dict) -> AgentTrace:
             )
             response = await agent.run(_user_message(case))
     except Exception as exc:
-        # One transient failure must not abort a 210-case run. The runner
+        # One transient failure must not abort a 220-case run. The runner
         # scores an errored trace as zero and continues.
         return AgentTrace(
             case_id=case["id"],
@@ -115,7 +137,7 @@ async def run_case(case: dict) -> AgentTrace:
         case_id=case["id"],
         output=_parse_output(response.text),
         raw_output=response.text,
-        tool_calls=_tool_calls(response),
+        calls=_extract_calls(response),
         tokens_in=usage.get("input_token_count", 0),
         tokens_out=usage.get("output_token_count", 0),
         latency_ms=(time.perf_counter() - t0) * 1000,

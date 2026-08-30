@@ -15,6 +15,7 @@ def load_cases(path: Path) -> list[dict]:
     cases = [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
     for c in cases:                       # metrics read tools off `expected`
         c["expected"]["_tools"] = c.get("expected_tool_calls", [])
+        c["expected"]["_oracle_facts"] = (c.get("oracle") or {}).get("facts")
     return cases
 
 
