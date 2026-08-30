@@ -89,20 +89,28 @@ def render_offline(facts, ev):
     if facts is None:
         return "[unreadable scan -- no extractable content]"
     name = NAMES.get(facts.procedure_code, "procedure")
-    out = ["ITEMISED BILL", f"Claim reference: {facts.claim_id}",
-           f"Policy: {facts.policy_id}    Provider: {facts.provider_id}",
-           f"Date of service: {facts.service_date.isoformat()}", "",
-           f"  {facts.procedure_code}  {name} ........ {facts.billed_amount}",
-           f"  TOTAL DUE ........................ {facts.billed_amount}"]
+    out = []
+
+    if "itemised_bill" in ev.documents_present:
+        out += ["ITEMISED BILL", f"Claim reference: {facts.claim_id}",
+                f"Policy: {facts.policy_id}    Provider: {facts.provider_id}",
+                f"Date of service: {facts.service_date.isoformat()}", "",
+                f"  {facts.procedure_code}  {name} ........ {facts.billed_amount}",
+                f"  TOTAL DUE ........................ {facts.billed_amount}"]
+
     if "clinical_note" in ev.documents_present:
-        out += ["", "CLINICAL NOTE",
+        if out:
+            out.append("")
+        out += ["CLINICAL NOTE",
                 f"Patient underwent {name} on {facts.service_date.isoformat()}.",
                 "Procedure completed without complication. Discharged same day."]
+
     if ev.amount_disagreement:
         out += ["", f"Note: attending physician records total as {facts.billed_amount * 2}."]
     if ev.prior_claim_ids_same_service:
         out += ["", "Resubmitting as requested by claims department."]
-    return "\n".join(out)
+
+    return "\n".join(out) if out else "[no documents attached]"
 
 
 def expected_tools(label: dict) -> list[str]:
