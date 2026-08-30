@@ -68,9 +68,20 @@ more consistently than its author had. See `docs/adr/0006`.
 ## Architecture
 
 
-Tools are exposed over MCP from a containerised server (270MB, non-root,
-health-probed). Business rules live in tested Python; the agent orchestrates
-rather than adjudicates.
+## Architecture
+
+```
+Claim submission
+      |
+Adjudicator agent  (Azure AI Foundry, gpt-5-mini)
+      |
+      +-- check_submission_tool   triage: missing docs, duplicates, contradictions
+      +-- compute_settlement_tool coverage arithmetic, deterministic
+      |
+Grounding check    (code, not a model -- see ADR 0007)
+      |
+Structured decision + rationale citing only tool-returned clauses
+```
 
 ## Running it
 
